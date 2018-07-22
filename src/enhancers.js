@@ -43,12 +43,9 @@ export const pure = props => inst =>
 
 export const styled = baseStyles => {
   const className = btoa(Math.random()).substr(5, 5)
-  const id = `sc-${className}`
   const parts = baseStyles.split('}').filter(s => s)
 
   const $styles = document.createElement('style')
-  $styles.type = 'text/css'
-  $styles.id = id
 
   $styles.appendChild(
     document.createTextNode(
@@ -61,10 +58,10 @@ export const styled = baseStyles => {
 
             if (last[1] && last[2]) {
               acc += `.${className} { ${p[0].replace(last[2], '')} }`
-              acc += `.${className} ${last[2]}{ ${p[1]} }`
+              acc += `.${className} ::slotted(${last[2]}) { ${p[1]} }`
             }
           } else if (p[1]) {
-            acc += `.${className} ${p[0]}{ ${p[1]} }`
+            acc += `.${className} ::slotted(${p[0]}) { ${p[1]} }`
           }
 
           return acc
@@ -73,34 +70,36 @@ export const styled = baseStyles => {
     )
   )
 
-  const clean = $styles.textContent.replace(new RegExp(`.${className} `, 'g'), '')
-
-  document.head.appendChild($styles)
+  const cleanStyles = $styles.textContent.replace(new RegExp(`.${className} `, 'gm'), '')
+  const noSlots = cleanStyles.replace(/::slotted\((.*?)\s+\)/gm, '$1')
 
   return inst => {
-    if (!('setStyles' in inst)) {
-      Object.defineProperty(inst, 'setStyles', {
-        value: function() {
-          if (this.useShadow) {
-            const $sStyles = document.createElement('style')
-            $sStyles.type = 'text/css'
+    $styles.id = `sc-${inst.displayName}`
+    const $cache = document.getElementById($styles.id)
 
-            this.styles.forEach(clean => $sStyles.appendChild(document.createTextNode(clean)))
-
-            this.shadow.appendChild($sStyles)
-            $styles.remove()
-          } else {
-            this.classList.add(className)
-          }
-
-          this.styles = []
-        }
-      })
+    if ($cache) {
+      document.head.replaceChild($styles, $cache)
+    } else {
+      document.head.appendChild($styles)
     }
 
     Object.defineProperty(inst, 'styles', {
       writable: true,
-      value: [...new Set((inst.styles || []).concat(clean).filter(a => a))]
+      value: [...new Set((inst.styles || []).concat(cleanStyles).filter(a => a))]
     })
+
+    if (!('setStyles' in inst)) {
+      Object.defineProperty(inst, 'setStyles', {
+        value: function() {
+          const $sStyles = document.createElement('style')
+
+          this.styles.forEach(s => $sStyles.appendChild(document.createTextNode(s)))
+          this.shadowRoot.children[0].appendChild($sStyles)
+
+          $styles.isConnected && document.head.removeChild($styles)
+          this.styles = []
+        }
+      })
+    }
   }
 }

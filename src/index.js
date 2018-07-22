@@ -49,6 +49,7 @@ const composeElement = (...args) => output =>
           )
             .then(() => {
               this.lastProps = Object.assign({}, this.props)
+              console.log(attr, nv, ov)
               this.props[attr] = nv
               ;[].slice.call(this.$el.querySelectorAll(`[slot=${attr}]`)).forEach($slot => ($slot.innerText = nv))
             })
@@ -66,7 +67,11 @@ const composeElement = (...args) => output =>
 
       connectedCallback: {
         value: function() {
+          this.$el = this
           this.key = this.getAttribute('key') || Math.random()
+          this.attachShadow({
+            mode: 'open'
+          })
 
           if (this.attributes) {
             ;[].slice.call(this.attributes).forEach(({ name, value }) => {
@@ -79,51 +84,30 @@ const composeElement = (...args) => output =>
             })
           }
 
-          if (this.useShadow) {
-            this.shadow = this.attachShadow({
-              mode: 'open'
-            })
-          } else {
+          this.render().then(() => {
             this.setStyles()
-          }
-
-          this.$el = this.useShadow ? this.shadow : this
-          this.render().then(this.attachEvents.bind(this))
+            this.attachEvents()
+          })
         }
       },
 
       render: {
         value: function() {
-          this.$template = document.createElement('template')
+          const $clone = this.$el.cloneNode(true)
+          const $template = document.createElement('template')
+          const [$buf, out] = frag(output.call(this, this.props))
 
-          iterChildren(this, $child => {
-            if ($child.hasAttribute('slot')) {
-              const $slot = document.createElement('slot')
-              const slotName = $child.getAttribute('slot')
-              $slot.setAttribute('name', slotName)
+          $template.content.appendChild(document.createElement('div'))
 
-              if ($child.parentNode !== this.$el) {
-                const $adj = this.querySelector(`[slot=${slotName}`)
-                $adj.parentNode.replaceChild($slot, $adj)
-              } else {
-                this.$template.appendChild($slot)
-              }
-            } else {
-              this.$template.appendChild($child.cloneNode(true))
-            }
-          }).then(() => this.$el.appendChild(this.$template.content.cloneNode(true)))
-
-          const buf = frag(output.call(this, {}))
-
-          iterChildren(buf, $child => {
+          iterChildren($buf, $child => {
             iterVars($child, (v, prop) => {
-              const cbuf = frag(v.replace(v, `<span slot="${prop}">${this.props[prop] || 'N/A'}</span>`))
+              const [cbuf] = frag(v.replace(v, `<span slot="${prop}">${this.props[prop] || 'N/A'}</span>`))
 
               if ($child.nodeType === 3) {
                 $child.parentNode.replaceChild(cbuf, $child)
               } else {
-                $child.innerText = $child.innerText.replace(v, '')
-                $child.appendChild(cbuf)
+                $child.setAttribute('slot', prop)
+                $child.innerText = $child.innerText.replace(v, this.props[prop] || 'N/A')
               }
             })
 
@@ -132,12 +116,24 @@ const composeElement = (...args) => output =>
                 .call($child.attributes)
                 .forEach(n => iterVars(n, (v, prop) => (n.nodeValue = this.props[prop] || 'N/A')))
             }
-          }).then(() => this.$el.appendChild(buf))
+          }).then(() => {
+            console.log($buf.cloneNode(true))
 
-          if (this.useShadow) {
-            this.setStyles()
-            // iterChildren(this, $child => $child.parentNode.removeChild($child))
-          }
+            iterChildren(this.$el, $child => $child.parentNode.removeChild($child))
+            iterChildren($buf.cloneNode(true), $child => this.$el.appendChild($child.cloneNode(true)))
+          })
+
+          iterChildren($clone.children[0], $child => {
+            if ($child.hasAttribute('slot')) {
+              const $slot = document.createElement('slot')
+              const slotName = $child.getAttribute('slot')
+              $slot.setAttribute('name', slotName)
+
+              $template.content.firstChild.appendChild($slot)
+            } else {
+              $template.content.firstChild.appendChild($child.cloneNode(true))
+            }
+          }).then(() => this.shadowRoot.appendChild($template.content.cloneNode(true)))
 
           return new Promise(y => y(this))
         }
@@ -145,44 +141,49 @@ const composeElement = (...args) => output =>
 
       attachEvents: {
         value: function() {
-          this.$el.addEventListener('click', () => {
-            this.props.increment.call(this, this.props.count + 1, this.props)
+          this.addEventListener('click', () => {
+            this.props.increment.call(this, this.props.count + 1)
           })
         }
       }
     })
 
-    enhance(H_IMPL.prototype)
+    const { displayName } = enhance(H_IMPL.prototype)
+
+    if (displayName) {
+      if (window.customElements.get(displayName)) {
+        location.reload()
+      }
+
+      window.customElements.define(displayName, H_IMPL)
+    }
+
     return H_IMPL
   })()
 
-if (window.customElements.get('hello-world')) {
-  location.reload()
-}
-
-window.customElements.define(
-  'hello-world',
-  composeElement(
-    styled(`
+composeElement(
+  {
+    displayName: 'hello-world'
+  },
+  styled(`
     h1 { color: #f36; }
     p { color: blue; }
     button {
       padding: 1em 2em;
       background: #f36;
     }
-  `),
-    withState('count', 'increment', 1),
-    withState('name', 'changeName', 'Hello World'),
-    withProps(() => ({
-      test: 15
-    }))
-  )(
-    ({ name, age, rating, count }) => `
-      <div>
-        <h1 contenteditable>{name}</h1>
-        <p>{test}</p>
-        <button>{count}</button>
-      </div>
-    `
-  )
+`),
+  withState('count', 'increment', 1),
+  withState('name', 'changeName', 'Hello World'),
+  withProps(({ test = 15 }) => ({
+    test
+  }))
+)(
+  ({ name, age, rating, count }) => `
+    <div>
+      <h1 contenteditable>{name}</h1>
+      <button>{count}</button>
+      <p>{test}</p>
+    </div>
+  `
 )

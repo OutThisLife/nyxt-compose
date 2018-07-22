@@ -51,7 +51,13 @@ export const iterChildren = (el, cb) => {
   })
 }
 
-export const frag = str => document.createRange().createContextualFragment(str)
+export const frag = str => {
+  const clean = str
+    .toString()
+    .replace(/\s\s+/g, ' ')
+    .trim()
+  return [document.createRange().createContextualFragment(clean), clean]
+}
 
 export function iterVars(el, cb) {
   try {
