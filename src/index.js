@@ -7,7 +7,7 @@ const attachComponent = (el, ...args) => {
     },
 
     didUpdate: function() {
-      iter([this._vars, this._attrs, this._frags], fn => fn.apply(this, arguments))
+      iter([this._frags, this._vars, this._attrs], fn => fn.apply(this, arguments))
     },
 
     _events: function() {
@@ -70,6 +70,7 @@ const attachComponent = (el, ...args) => {
           if ($var.hasAttribute('value') || $var.hasAttribute('contenteditable')) {
             delete $var.dataset.key
           }
+
           raf(() => {
             $var.replaceChild($frag.cloneNode(true), $var.childNodes[0])
           })
