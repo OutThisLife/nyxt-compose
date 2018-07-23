@@ -1,189 +1,137 @@
-import { withProps, withState, onlyUpdateForKeys, pure, styled } from './enhancers'
-import { shallowEqual, frag, iterChildren, iterVars } from './utils'
+import { withState } from './enhancers'
+import { shallowEqual, frag, iter } from './utils'
 
-const composeElement = (...args) => output =>
-  ((H = HTMLElement) => {
-    function H_IMPL() {
-      return Reflect.construct(H, [], this.constructor)
+const attachComponent = (selector, ...args) => {
+  const el = document.querySelector(selector)
+
+  if (!el) {
+    return
+  }
+
+  const impl = Object.create({
+    didMount: function() {
+      this.processVars.apply(this, arguments)
+    },
+
+    didUpdate: function() {
+      this.processVars.apply(this, arguments)
+      this.processFrags.apply(this, arguments)
+    },
+
+    processFrags: function() {
+      iter(this.$frags, fragment => {
+        const { adjSelector } = fragment
+        const $sibling = el.querySelector(adjSelector)
+
+        if (!$sibling) {
+          return -1
+        }
+
+        const { $frag, assert } = fragment
+
+        assert
+          .apply(this, arguments)
+          .then(() => $sibling.parentNode.insertBefore($frag.cloneNode(true), $sibling.nextSibling))
+          .catch(kill => kill && $sibling.parentNode.removeChild($sibling.nextSibling))
+      })
+
+      return this
+    },
+
+    processVars: function(state) {
+      iter(this.$vars, ({ key, selector }) => {
+        const $var = el.querySelector(selector)
+
+        if (!($var && key in state)) {
+          return -1
+        }
+
+        $var.textContent = state[key]
+      })
     }
+  })
 
-    const enhance = proto =>
-      args.reduce((acc, cb, idx) => {
-        if (typeof cb === 'function') {
-          cb(acc)
-        } else if (typeof cb === 'object') {
-          Object.assign(proto, cb)
+  Object.defineProperty(impl, 'state', {
+    writable: true,
+    value: new Proxy(
+      {
+        count: 0,
+        toggled: 0
+      },
+      {
+        set: (state, prop, nv) => {
+          const oldState = Object.assign({}, state)
+          const ov = oldState[prop]
+
+          if (!shallowEqual(ov, nv)) {
+            state[prop] = nv
+            impl.didUpdate.call(impl, state, oldState)
+          }
+
+          return 1
         }
+      }
+    )
+  })
 
-        return acc
-      }, proto)
-
-    Object.setPrototypeOf(H_IMPL.prototype, H.prototype)
-    Object.defineProperties(H_IMPL.prototype, {
-      useShadow: {
-        writable: true,
-        value: true
-      },
-
-      observedAttributes: {
-        enumerable: true,
-        writable: true,
-        value: []
-      },
-
-      lastProps: {
-        writable: true,
-        value: {}
-      },
-
-      props: {
-        enumerable: true,
-        configurable: true,
-        value: {}
-      },
-
-      updateProp: {
-        value: function(attr, nv, ov = this.props[attr]) {
-          return Promise.all(
-            this.shouldUpdate.map(fn => new Promise((y, n) => (fn.call(this, attr, nv, ov) ? y() : n())))
-          )
-            .then(() => {
-              this.lastProps = Object.assign({}, this.props)
-              console.log(attr, nv, ov)
-              this.props[attr] = nv
-              ;[].slice.call(this.$el.querySelectorAll(`[slot=${attr}]`)).forEach($slot => ($slot.innerText = nv))
-            })
-            .catch(e => {})
-        }
-      },
-
-      shouldUpdate: {
-        value: [
-          function(attr) {
-            return this.observedAttributes.includes(attr)
+  Object.defineProperty(impl, 'events', {
+    value: [
+      {
+        type: 'click',
+        events: [
+          {
+            selector: '[data-key="0.0"]',
+            handle: function() {
+              return ({ count, toggled }) => {
+                this.state.toggled ^= 1
+                this.state.count += 1
+              }
+            }
           }
         ]
-      },
+      }
+    ]
+  })
 
-      connectedCallback: {
-        value: function() {
-          this.$el = this
-          this.key = this.getAttribute('key') || Math.random()
-          this.attachShadow({
-            mode: 'open'
-          })
+  Object.defineProperty(impl, '$frags', {
+    value: [
+      {
+        $frag: frag('<div>toggled</div>'),
+        adjSelector: '[data-key="0.0"]',
+        assert: (state, oldState) => {
+          const diff = !shallowEqual(state.toggled, oldState.toggled)
+          return new Promise((y, n) => (state.toggled && diff ? y() : n(diff)))
+        }
+      }
+    ]
+  })
 
-          if (this.attributes) {
-            ;[].slice.call(this.attributes).forEach(({ name, value }) => {
-              if (name in this.props) {
-                return
-              }
+  Object.defineProperty(impl, '$vars', {
+    value: [
+      {
+        key: 'count',
+        selector: '[data-key="0.1"]'
+      }
+    ]
+  })
 
-              this.observedAttributes.push(name)
-              this.updateProp(name, value)
-            })
+  iter(impl.events, ({ type, events }) => {
+    el.addEventListener(type, e => {
+      iter(events, ({ selector, handle }) => {
+        if (e.target.matches(selector)) {
+          try {
+            handle.call(impl, e)(impl.state)
+          } catch (e) {
+            console.error(e)
           }
 
-          this.render().then(() => {
-            this.setStyles()
-            this.attachEvents()
-          })
+          return -1
         }
-      },
-
-      render: {
-        value: function() {
-          const $clone = this.$el.cloneNode(true)
-          const $template = document.createElement('template')
-          const [$buf, out] = frag(output.call(this, this.props))
-
-          $template.content.appendChild(document.createElement('div'))
-
-          iterChildren($buf, $child => {
-            iterVars($child, (v, prop) => {
-              const [cbuf] = frag(v.replace(v, `<span slot="${prop}">${this.props[prop] || 'N/A'}</span>`))
-
-              if ($child.nodeType === 3) {
-                $child.parentNode.replaceChild(cbuf, $child)
-              } else {
-                $child.setAttribute('slot', prop)
-                $child.innerText = $child.innerText.replace(v, this.props[prop] || 'N/A')
-              }
-            })
-
-            if ($child.attributes) {
-              ;[].slice
-                .call($child.attributes)
-                .forEach(n => iterVars(n, (v, prop) => (n.nodeValue = this.props[prop] || 'N/A')))
-            }
-          }).then(() => {
-            console.log($buf.cloneNode(true))
-
-            iterChildren(this.$el, $child => $child.parentNode.removeChild($child))
-            iterChildren($buf.cloneNode(true), $child => this.$el.appendChild($child.cloneNode(true)))
-          })
-
-          iterChildren($clone.children[0], $child => {
-            if ($child.hasAttribute('slot')) {
-              const $slot = document.createElement('slot')
-              const slotName = $child.getAttribute('slot')
-              $slot.setAttribute('name', slotName)
-
-              $template.content.firstChild.appendChild($slot)
-            } else {
-              $template.content.firstChild.appendChild($child.cloneNode(true))
-            }
-          }).then(() => this.shadowRoot.appendChild($template.content.cloneNode(true)))
-
-          return new Promise(y => y(this))
-        }
-      },
-
-      attachEvents: {
-        value: function() {
-          this.addEventListener('click', () => {
-            this.props.increment.call(this, this.props.count + 1)
-          })
-        }
-      }
+      })
     })
+  })
 
-    const { displayName } = enhance(H_IMPL.prototype)
+  window.requestAnimationFrame(() => impl.didMount.call(impl, impl.state))
+}
 
-    if (displayName) {
-      if (window.customElements.get(displayName)) {
-        location.reload()
-      }
-
-      window.customElements.define(displayName, H_IMPL)
-    }
-
-    return H_IMPL
-  })()
-
-composeElement(
-  {
-    displayName: 'hello-world'
-  },
-  styled(`
-    h1 { color: #f36; }
-    p { color: blue; }
-    button {
-      padding: 1em 2em;
-      background: #f36;
-    }
-`),
-  withState('count', 'increment', 1),
-  withState('name', 'changeName', 'Hello World'),
-  withProps(({ test = 15 }) => ({
-    test
-  }))
-)(
-  ({ name, age, rating, count }) => `
-    <div>
-      <h1 contenteditable>{name}</h1>
-      <button>{count}</button>
-      <p>{test}</p>
-    </div>
-  `
-)
+attachComponent('div', withState('toggled', 'setToggle', false), withState('count', 'increment', false))

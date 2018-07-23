@@ -1,3 +1,16 @@
+export const enhance = (args, proto) =>
+  args.reduce((acc, cb, idx) => {
+    if (typeof cb === 'function') {
+      cb(acc)
+    } else if (typeof cb === 'object') {
+      Object.assign(proto, cb)
+    }
+
+    return acc
+  }, proto)
+
+// --------------------------------------------------
+
 export const withState = (name, fn, defaultValue) => (inst, props = inst.props) =>
   !(name in props)
     ? Object.defineProperties(inst, {

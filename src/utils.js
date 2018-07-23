@@ -27,44 +27,18 @@ export const shallowEqual = (a, b) => {
   return true
 }
 
-export const iterChildren = (el, cb) => {
-  const $children = (() => {
-    if (el instanceof DocumentFragment) {
-      return el.children[0].childNodes
+export const frag = str =>
+  document.createRange().createContextualFragment(
+    str
+      .toString()
+      .replace(/\s\s+/g, ' ')
+      .trim()
+  )
+
+export const iter = (set, cb) => {
+  for (let i = 0, l = set.length; i < l; i++) {
+    if (cb(set[i]) === -1) {
+      break
     }
-
-    return el.querySelectorAll('*')
-  })()
-
-  return new Promise((y, n) => {
-    try {
-      for (let i = 0, l = $children.length; i < l; i++) {
-        cb($children[i])
-
-        if (i === l - 1) {
-          y()
-        }
-      }
-    } catch (e) {
-      n(e)
-    }
-  })
-}
-
-export const frag = str => {
-  const clean = str
-    .toString()
-    .replace(/\s\s+/g, ' ')
-    .trim()
-  return [document.createRange().createContextualFragment(clean), clean]
-}
-
-export function iterVars(el, cb) {
-  try {
-    const vars = (el.nodeValue || el.innerText).match(/({([A-z]+)})/g) || []
-
-    for (let i = 0, l = vars.length; i < l; i++) {
-      cb(vars[i], vars[i].slice(1, -1))
-    }
-  } catch (e) {}
+  }
 }

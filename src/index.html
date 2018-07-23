@@ -8,29 +8,17 @@
 </head>
 <body>
 
-  <hello-world>
-    <div>
-      <h1 slot="name">Austin Pickettttt</h1>
-      <div slot="rating">2/5, 4/5 w/ rice</div>
-      <div slot="test"></div>
-      <button slot="count">0</button>
-    </div>
-  </hello-world>
-
-  <hello-world></hello-world>
-
-  <hello-world>
-    <div>
-      <h1 slot="name">Austin Pickettttt</h1>
-      <div slot="rating">2/5, 4/5 w/ rice</div>
-      <div slot="test"></div>
-      <button slot="count">0</button>
-    </div>
-  </hello-world>
-
-  <p>
-    this p tag is unaffacted.
-  </p>
+  <!--
+    <>
+      <button onClick={() => setToggle()}>Toggle {count}</button>
+      {toggled && <div>toggled</div>}
+    </>
+  -->
+  <div>
+    <button data-key="0.0">
+      toggle <span data-key="0.1">0</span>
+    </button>
+  </div>
 
   <script src="./index.js"></script>
 </body>
