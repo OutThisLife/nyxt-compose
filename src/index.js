@@ -1,16 +1,28 @@
-import { shallowEqual, frag, iter, snakeCase } from './utils'
+import { shallowEqual, frag, iter, raf, snakeCase } from './utils'
 
 const attachComponent = (el, ...args) => {
   const IMPL = Object.create({
     didMount: function() {
-      iter([this._vars, this._attrs], fn => fn.apply(this, arguments))
+      iter([this._events, this._vars, this._attrs], fn => fn.apply(this, arguments))
+    },
 
+    didUpdate: function() {
+      iter([this._vars, this._attrs, this._frags], fn => fn.apply(this, arguments))
+    },
+
+    _events: function() {
       iter(IMPL.events, ({ type, events }) =>
         el.addEventListener(type, e =>
           iter(events, ({ selector, handle }) => {
-            if (e.target.matches(selector)) {
+            let target = e.target
+
+            if (target.nodeType === 3) {
+              target = target.parentElement
+            }
+
+            if (target.matches(selector)) {
               try {
-                window.requestAnimationFrame(() => handle.call(IMPL, e)(IMPL.props))
+                raf(() => handle.call(IMPL, e)(IMPL.props))
               } catch (e) {
                 console.error(e)
               }
@@ -20,10 +32,6 @@ const attachComponent = (el, ...args) => {
           })
         )
       )
-    },
-
-    didUpdate: function() {
-      iter([this._vars, this._attrs, this._frags], fn => fn.apply(this, arguments))
     },
 
     _frags: function() {
@@ -39,8 +47,8 @@ const attachComponent = (el, ...args) => {
 
         assert
           .apply(this, arguments)
-          .then(() => $sibling.parentNode.insertBefore($frag.cloneNode(true), $sibling.nextSibling))
-          .catch(kill => kill && $sibling.parentNode.removeChild($sibling.nextSibling))
+          .then(() => raf(() => $sibling.parentNode.insertBefore($frag.cloneNode(true), $sibling.nextSibling)))
+          .catch(kill => kill && raf(() => $sibling.parentNode.removeChild($sibling.nextSibling)))
       })
 
       return this
@@ -49,15 +57,23 @@ const attachComponent = (el, ...args) => {
     _vars: function(props) {
       iter(this.$propVars, propVar => {
         const { prop, selector } = propVar
-        const $var = el.querySelector(selector)
+        const $foundVars = el.querySelectorAll(selector)
 
-        if (!($var && prop in props)) {
+        if (!($foundVars && prop in props)) {
           return -1
         }
 
         const $frag = document.createDocumentFragment()
         $frag.appendChild(document.createTextNode(props[prop]))
-        $var.replaceChild($frag, $var.childNodes[0])
+
+        iter($foundVars, $var => {
+          if ($var.hasAttribute('value') || $var.hasAttribute('contenteditable')) {
+            delete $var.dataset.key
+          }
+          raf(() => {
+            $var.replaceChild($frag.cloneNode(true), $var.childNodes[0])
+          })
+        })
       })
     },
 
@@ -89,17 +105,18 @@ const attachComponent = (el, ...args) => {
     writable: true,
     value: new Proxy(
       {
+        title: 'Hello',
         count: 0,
         toggled: 0
       },
       {
         set: (props, prop, nv) => {
-          const oldprops = Object.assign({}, props)
-          const ov = oldprops[prop]
+          const oldProps = Object.assign({}, props)
+          const ov = oldProps[prop]
 
           if (!shallowEqual(ov, nv)) {
             props[prop] = nv
-            IMPL.didUpdate.call(IMPL, props, oldprops)
+            IMPL.didUpdate.call(IMPL, props, oldProps)
           }
 
           return 1
@@ -110,12 +127,11 @@ const attachComponent = (el, ...args) => {
 
   Object.defineProperty(IMPL, 'attrs', {
     get: function() {
+      const { count, toggled } = this.props
+
       return {
-        title: 'world, halt',
-        rel: this.props.count < 5 ? 'invalid' : 'awesome',
         style: {
-          padding: '25px',
-          background: this.props.toggled ? 'red' : 'blue',
+          background: toggled ? '#f36' : '#fafafa',
           transition: '.3s ease-in-out'
         }
       }
@@ -125,7 +141,7 @@ const attachComponent = (el, ...args) => {
   Object.defineProperty(IMPL, 'events', {
     value: [
       {
-        type: 'click',
+        type: 'mousedown',
         events: [
           {
             selector: '[data-key="0.0"]',
@@ -138,6 +154,23 @@ const attachComponent = (el, ...args) => {
             handle: function() {
               return ({ count, toggled }) => (this.props.count += 1)
             }
+          },
+          {
+            selector: '[data-key="0.3"]',
+            handle: function() {
+              return () => raf(() => el.parentNode.removeChild(el))
+            }
+          }
+        ]
+      },
+      {
+        type: 'DOMCharacterDataModified',
+        events: [
+          {
+            selector: '[contenteditable]',
+            handle: function(e) {
+              return ({ title }) => (this.props.title = e.newValue)
+            }
           }
         ]
       }
@@ -149,9 +182,9 @@ const attachComponent = (el, ...args) => {
       {
         $frag: frag('<div>toggled</div>'),
         adjSelector: '[data-key="0.0"]',
-        assert: (props, oldprops) => {
-          const diff = !shallowEqual(props.toggled, oldprops.toggled)
-          return new Promise((y, n) => (props.toggled && diff ? y() : n(diff)))
+        assert: ({ toggled }, oldProps) => {
+          const diff = !shallowEqual(toggled, oldProps.toggled)
+          return new Promise((y, n) => (toggled && diff ? y() : n(diff)))
         }
       }
     ]
@@ -162,11 +195,15 @@ const attachComponent = (el, ...args) => {
       {
         prop: 'count',
         selector: '[data-key="0.1"]'
+      },
+      {
+        prop: 'title',
+        selector: '[data-key="0.4"]'
       }
     ]
   })
 
-  window.requestAnimationFrame(() => IMPL.didMount.call(IMPL, IMPL.props))
+  raf(() => IMPL.didMount.call(IMPL, Object.assign({}, IMPL.props)))
 }
 
 iter(document.getElementsByTagName('div'), el => attachComponent(el))
