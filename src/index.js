@@ -1,24 +1,32 @@
-import { withState } from './enhancers'
-import { shallowEqual, frag, iter } from './utils'
+import { shallowEqual, frag, iter, snakeCase } from './utils'
 
-const attachComponent = (selector, ...args) => {
-  const el = document.querySelector(selector)
-
-  if (!el) {
-    return
-  }
-
-  const impl = Object.create({
+const attachComponent = (el, ...args) => {
+  const IMPL = Object.create({
     didMount: function() {
-      this.processVars.apply(this, arguments)
+      iter([this._vars, this._attrs], fn => fn.apply(this, arguments))
+
+      iter(IMPL.events, ({ type, events }) =>
+        el.addEventListener(type, e =>
+          iter(events, ({ selector, handle }) => {
+            if (e.target.matches(selector)) {
+              try {
+                window.requestAnimationFrame(() => handle.call(IMPL, e)(IMPL.props))
+              } catch (e) {
+                console.error(e)
+              }
+
+              return -1
+            }
+          })
+        )
+      )
     },
 
     didUpdate: function() {
-      this.processVars.apply(this, arguments)
-      this.processFrags.apply(this, arguments)
+      iter([this._vars, this._attrs, this._frags], fn => fn.apply(this, arguments))
     },
 
-    processFrags: function() {
+    _frags: function() {
       iter(this.$frags, fragment => {
         const { adjSelector } = fragment
         const $sibling = el.querySelector(adjSelector)
@@ -38,20 +46,46 @@ const attachComponent = (selector, ...args) => {
       return this
     },
 
-    processVars: function(state) {
-      iter(this.$vars, ({ key, selector }) => {
+    _vars: function(props) {
+      iter(this.$propVars, propVar => {
+        const { prop, selector } = propVar
         const $var = el.querySelector(selector)
 
-        if (!($var && key in state)) {
+        if (!($var && prop in props)) {
           return -1
         }
 
-        $var.textContent = state[key]
+        const $frag = document.createDocumentFragment()
+        $frag.appendChild(document.createTextNode(props[prop]))
+        $var.replaceChild($frag, $var.childNodes[0])
+      })
+    },
+
+    _attrs: function() {
+      const atts = this.attrs
+
+      iter(Object.keys(atts), key => {
+        let nv = atts[key]
+        const ov = el.getAttribute(key)
+
+        if (key === 'style' && typeof nv === 'object') {
+          const keys = Object.keys(nv)
+          const values = Object.values(nv)
+
+          nv = keys.reduce((acc, id, idx) => {
+            acc += `${snakeCase(id)}: ${values[idx]};`
+            return acc
+          }, '')
+        }
+
+        if (!shallowEqual(nv, ov)) {
+          el.setAttribute(key, nv)
+        }
       })
     }
   })
 
-  Object.defineProperty(impl, 'state', {
+  Object.defineProperty(IMPL, 'props', {
     writable: true,
     value: new Proxy(
       {
@@ -59,13 +93,13 @@ const attachComponent = (selector, ...args) => {
         toggled: 0
       },
       {
-        set: (state, prop, nv) => {
-          const oldState = Object.assign({}, state)
-          const ov = oldState[prop]
+        set: (props, prop, nv) => {
+          const oldprops = Object.assign({}, props)
+          const ov = oldprops[prop]
 
           if (!shallowEqual(ov, nv)) {
-            state[prop] = nv
-            impl.didUpdate.call(impl, state, oldState)
+            props[prop] = nv
+            IMPL.didUpdate.call(IMPL, props, oldprops)
           }
 
           return 1
@@ -74,7 +108,21 @@ const attachComponent = (selector, ...args) => {
     )
   })
 
-  Object.defineProperty(impl, 'events', {
+  Object.defineProperty(IMPL, 'attrs', {
+    get: function() {
+      return {
+        title: 'world, halt',
+        rel: this.props.count < 5 ? 'invalid' : 'awesome',
+        style: {
+          padding: '25px',
+          background: this.props.toggled ? 'red' : 'blue',
+          transition: '.3s ease-in-out'
+        }
+      }
+    }
+  })
+
+  Object.defineProperty(IMPL, 'events', {
     value: [
       {
         type: 'click',
@@ -82,10 +130,13 @@ const attachComponent = (selector, ...args) => {
           {
             selector: '[data-key="0.0"]',
             handle: function() {
-              return ({ count, toggled }) => {
-                this.state.toggled ^= 1
-                this.state.count += 1
-              }
+              return ({ count, toggled }) => (this.props.toggled ^= 1)
+            }
+          },
+          {
+            selector: '[data-key="0.2"]',
+            handle: function() {
+              return ({ count, toggled }) => (this.props.count += 1)
             }
           }
         ]
@@ -93,45 +144,29 @@ const attachComponent = (selector, ...args) => {
     ]
   })
 
-  Object.defineProperty(impl, '$frags', {
+  Object.defineProperty(IMPL, '$frags', {
     value: [
       {
         $frag: frag('<div>toggled</div>'),
         adjSelector: '[data-key="0.0"]',
-        assert: (state, oldState) => {
-          const diff = !shallowEqual(state.toggled, oldState.toggled)
-          return new Promise((y, n) => (state.toggled && diff ? y() : n(diff)))
+        assert: (props, oldprops) => {
+          const diff = !shallowEqual(props.toggled, oldprops.toggled)
+          return new Promise((y, n) => (props.toggled && diff ? y() : n(diff)))
         }
       }
     ]
   })
 
-  Object.defineProperty(impl, '$vars', {
+  Object.defineProperty(IMPL, '$propVars', {
     value: [
       {
-        key: 'count',
+        prop: 'count',
         selector: '[data-key="0.1"]'
       }
     ]
   })
 
-  iter(impl.events, ({ type, events }) => {
-    el.addEventListener(type, e => {
-      iter(events, ({ selector, handle }) => {
-        if (e.target.matches(selector)) {
-          try {
-            handle.call(impl, e)(impl.state)
-          } catch (e) {
-            console.error(e)
-          }
-
-          return -1
-        }
-      })
-    })
-  })
-
-  window.requestAnimationFrame(() => impl.didMount.call(impl, impl.state))
+  window.requestAnimationFrame(() => IMPL.didMount.call(IMPL, IMPL.props))
 }
 
-attachComponent('div', withState('toggled', 'setToggle', false), withState('count', 'increment', false))
+iter(document.getElementsByTagName('div'), el => attachComponent(el))
