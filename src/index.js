@@ -277,9 +277,7 @@ document.body.addEventListener('mousedown', ({ target }) => {
       iter([...Array(num | 0)], () => $frag.appendChild($div.cloneNode(true)))
       raf(() => $app.appendChild($frag.cloneNode(true)))
     } else {
-      for (let i = 0, l = MIN_INT(num, $app.children.length); i < l; i++) {
-        raf(() => $app.removeChild($app.lastChild), false)
-      }
+      iter(MIN_INT(num, $app.children.length), () => raf(() => $app.removeChild($app.lastChild), false))
     }
   }
 })

@@ -35,9 +35,9 @@ export const frag = str =>
       .trim()
   )
 
-export const iter = (set, cb) => {
-  for (let i = 0, l = set.length; i < l; i++) {
-    if (cb(set[i]) === -1) {
+export const iter = (set, cb = () => {}, isObj = typeof set === 'object') => {
+  for (let i = 0, l = isObj ? set.length : set; i < l; i++) {
+    if (cb(isObj ? set[i] : i) === -1) {
       break
     }
   }
