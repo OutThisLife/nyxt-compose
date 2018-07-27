@@ -294,20 +294,3 @@ $textarea.addEventListener('focus', () => {
 })
 
 $textarea.addEventListener('blur', () => ($note.innerHTML = '&nbsp;'))
-
-// --
-
-// let tick
-// new MutationObserver(muts => {
-//   const valid = muts.filter(({ type }) => type === 'childList')
-
-//   if (valid.length && !tick) {
-//     window.requestAnimationFrame(() => {
-//       const list = getAll()
-//       console.log('There are %d listeners', list.length, list)
-//       window.requestAnimationFrame(() => (tick = false))
-//     })
-
-//     tick = true
-//   }
-// }).observe(document.documentElement, { childList: true, subtree: true })
