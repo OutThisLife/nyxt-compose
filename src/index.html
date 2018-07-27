@@ -91,15 +91,22 @@ const getAll = () => [].slice.call(document.querySelectorAll('*'))
   .map(el => ({ el, listeners: Object.entries(_getEventListeners(el)) }))
   .filter(el => el.listeners.length)
 
-let tick
+let tick, lastN = 0
 new MutationObserver(muts => {
   const valid = muts.filter(({ type }) => type === 'childList')
 
   if (valid.length && !tick) {
     window.requestAnimationFrame(() => {
       const list = getAll()
-      console.log('There are %d listeners', list.length, list)
-      window.requestAnimationFrame(() => (tick = false))
+      const len = list.length
+
+      if (lastN === len) {
+        tick = false
+      } else {
+        lastN = len
+        console.log('There are %d listeners', len, list)
+        window.requestAnimationFrame(() => (tick = false))
+      }
     })
 
     tick = true
