@@ -18,11 +18,36 @@
   }
 
   .gc:nth-of-type(even) {
-    filter: invert(1) blur(5px);
+    outline: 5px solid blue;
   }
 
   .gc {
     padding: 5vw;
+  }
+
+  footer p {
+    margin: 0 0 .23em;
+  }
+
+  footer {
+    z-index: 100;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 2vw;
+    box-shadow: 0 0 200px rgba(0,0,0,.2);
+    background: #FFF;
+  }
+
+  footer textarea {
+    display: block;
+    width: 100%;
+    height: 80px;
+    resize: horizontal;
+    border: 0;
+    padding: 7px;
+    background: #CCC;
   }
   </style>
 </head>
@@ -55,6 +80,35 @@
       </div>
     </section>
   </main>
+
+  <footer>
+    <p>copy and paste this to console to see events attaching and
+      detaching as you click add and remove</p>
+
+    <textarea readonly>
+const _getEventListeners = getEventListeners
+const getAll = () => [].slice.call(document.querySelectorAll('*'))
+  .map(el => ({ el, listeners: Object.entries(_getEventListeners(el)) }))
+  .filter(el => el.listeners.length)
+
+let tick
+new MutationObserver(muts => {
+  const valid = muts.filter(({ type }) => type === 'childList')
+
+  if (valid.length && !tick) {
+    window.requestAnimationFrame(() => {
+      const list = getAll()
+      console.log('There are %d listeners', list.length, list)
+      window.requestAnimationFrame(() => (tick = false))
+    })
+
+    tick = true
+  }
+}).observe(app, { childList: true, subtree: true })
+    </textarea>
+
+    <div>&nbsp;</div>
+  </footer>
 
   <script src="./index.js"></script>
 </body>

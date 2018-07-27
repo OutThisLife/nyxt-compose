@@ -221,6 +221,15 @@ const attachNodes = nodes =>
     }
   })
 
+const $app = document.getElementById('app')
+const $nodes = document.getElementsByClassName('gc')
+const $tmp = $nodes[0].cloneNode(true)
+
+const $add = document.body.children[0]
+const $remove = $add.nextElementSibling
+
+attachNodes([].slice.call($nodes))
+
 // ----------------------------------------------
 
 new MutationObserver(mutations => {
@@ -233,7 +242,7 @@ new MutationObserver(mutations => {
       }
     }
   })
-}).observe(document.body, { childList: true, subtree: true })
+}).observe($app, { childList: true, subtree: true })
 
 // ----------------------------------------------
 
@@ -246,15 +255,6 @@ window.addEventListener('scroll', () =>
     stm = setTimeout(() => (document.body.style.pointerEvents = ''), 350)
   })
 )
-
-// ----------------------------------------------
-
-const $app = document.getElementById('app')
-const $nodes = document.getElementsByClassName('gc')
-const $tmp = $nodes[0].cloneNode(true)
-
-const $add = document.body.children[0]
-const $remove = $add.nextElementSibling
 
 document.body.addEventListener('click', ({ target }) => {
   if (target === $add || target === $remove) {
@@ -283,7 +283,17 @@ document.body.addEventListener('click', ({ target }) => {
   }
 })
 
-attachNodes([].slice.call($nodes))
+// ----------------------------------------------
+
+const $textarea = document.querySelector('textarea')
+const $note = $textarea.nextElementSibling
+
+$textarea.addEventListener('focus', () => {
+  $textarea.select()
+  new Promise(resolve => resolve(document.execCommand.call(document, 'Copy'))).then(() => ($note.innerHTML = 'Copied!'))
+})
+
+$textarea.addEventListener('blur', () => ($note.innerHTML = '&nbsp;'))
 
 // --
 
