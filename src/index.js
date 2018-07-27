@@ -1,4 +1,5 @@
 import { shallowEqual, frag, iter, raf, snakeCase } from './utils'
+import { MIN_INT } from './bithax'
 
 const attachComponent = el => {
   const IMPL = Object.create({
@@ -221,12 +222,11 @@ const attachNodes = nodes =>
     }
   })
 
+const $header = document.querySelector('header')
+const $count = $header.querySelector('span')
 const $app = document.getElementById('app')
 const $nodes = document.getElementsByClassName('gc')
 const $tmp = $nodes[0].cloneNode(true)
-
-const $add = document.body.children[0]
-const $remove = $add.nextElementSibling
 
 attachNodes([].slice.call($nodes))
 
@@ -240,6 +240,12 @@ new MutationObserver(mutations => {
       if (nodes.length) {
         attachNodes(nodes)
       }
+
+      raf(() => {
+        const $frag = document.createDocumentFragment()
+        $frag.appendChild(document.createTextNode($nodes.length))
+        $count.children[0].replaceChild($frag, $count.children[0].childNodes[0])
+      })
     }
   })
 }).observe($app, { childList: true, subtree: true })
@@ -256,29 +262,24 @@ window.addEventListener('scroll', () =>
   })
 )
 
-document.body.addEventListener('click', ({ target }) => {
+const $add = $header.children[0]
+const $remove = $add.nextElementSibling
+
+document.body.addEventListener('mousedown', ({ target }) => {
   if (target === $add || target === $remove) {
-    const $frag = document.createDocumentFragment()
-    const { num } = target.dataset
+    const num = target.dataset.num | 0
 
     if (target === $add) {
+      const $frag = document.createDocumentFragment()
       const $div = $tmp.cloneNode(true)
       $div.classList.add('cloned')
 
-      iter([...Array(parseInt(num))], () => $frag.appendChild($div.cloneNode(true)))
-      raf(() => $app.children[0].appendChild($frag.cloneNode(true)))
+      iter([...Array(num | 0)], () => $frag.appendChild($div.cloneNode(true)))
+      raf(() => $app.appendChild($frag.cloneNode(true)))
     } else {
-      const $frag = document.createDocumentFragment()
-      $frag.appendChild($app.children[0].cloneNode(true))
-
-      const $container = $frag.children[0]
-      let n = Math.min(parseInt(num), $container.children.length - 1)
-
-      while (n--) {
-        $container.removeChild($container.children[n])
+      for (let i = 0, l = MIN_INT(num, $app.children.length); i < l; i++) {
+        raf(() => $app.removeChild($app.lastChild), false)
       }
-
-      $app.replaceChild($frag.cloneNode(true), $app.children[0])
     }
   }
 })
@@ -289,7 +290,9 @@ document.querySelector('textarea').addEventListener('focus', ({ currentTarget })
   const $note = currentTarget.nextElementSibling
 
   currentTarget.select()
-  new Promise(resolve => resolve(document.execCommand.call(document, 'Copy'))).then(() => ($note.innerHTML = 'Copied!'))
+  new Promise(resolve => {
+    resolve(document.execCommand.call(document, 'Copy'))
+  }).then(() => ($note.innerHTML = 'Copied!'))
 
   currentTarget.addEventListener('blur', () => ($note.innerHTML = '&nbsp;'), { once: true })
 })

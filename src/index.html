@@ -7,27 +7,35 @@
   <title>Document</title>
 
   <style>
-  body > button {
-    z-index: 100;
-    position: fixed;
-    top: 2vw;
-    right: 2vw;
-  }
-  body > button + button {
-    top: 5vw;
+  * { box-sizing: border-box }
+
+  html {
+    font-family: dotum, 돋움, serif
   }
 
-  .gc:nth-of-type(even) {
-    outline: 5px solid blue;
+  input, button, textarea {
+    font-family: inherit;
   }
+
+  header {
+    z-index: 100;
+    position: sticky;
+    top: 0;
+    text-align: center;
+    padding: 2vw;
+    box-shadow: 0 0 200px rgba(0,0,0,.2);
+    background: #FFF;
+  }
+    header button + button {
+      margin-left: 1vw;
+    }
 
   .gc {
     padding: 5vw;
   }
-
-  footer p {
-    margin: 0 0 .23em;
-  }
+    .gc:nth-of-type(even) {
+      outline: 5px solid blue;
+    }
 
   footer {
     z-index: 100;
@@ -39,46 +47,50 @@
     box-shadow: 0 0 200px rgba(0,0,0,.2);
     background: #FFF;
   }
+    footer p {
+      margin: 0 0 .23em;
+    }
 
-  footer textarea {
-    display: block;
-    width: 100%;
-    height: 80px;
-    resize: horizontal;
-    border: 0;
-    padding: 7px;
-    background: #CCC;
-  }
+    footer textarea {
+      display: block;
+      width: 100%;
+      height: 80px;
+      resize: vertical;
+      border: 0;
+      padding: 7px;
+      background: #CCC;
+    }
   </style>
 </head>
 <body>
 
-  <button data-num="124">add 124</button>
-  <button data-num="62">remove 62</button>
+  <header>
+    <button data-num="124">add 124</button>
+    <button data-num="62">remove 62</button>
+    <span>total: <strong>1</strong></span>
+  </header>
 
   <main id='app'>
-    <section>
-      <!--
-        <>
-          <button onClick={() => setToggle()}>Toggle {count}</button>
-          {toggled && <div>toggled</div>}
-        </>
-      -->
-      <div class="gc">
-        <h2>kk well lets do one more <a href='javascript:;' data-key="0.3">Remove me</a></h2>
+    <!--
+      <>
+        <button onClick={() => setToggle()}>Toggle {count}</button>
+        {toggled && <div>toggled</div>}
+      </>
+    -->
+    <div class="gc">
+      <h2>kk well lets do one more <a href='javascript:;' data-key="0.3">Remove me</a></h2>
 
-        <h3 data-key="0.4" contenteditable>hello</h3>
-        <p data-key="0.4">hello</p>
+      <h3 data-key="0.4" contenteditable>hello</h3>
+      <p data-key="0.4">hello</p>
 
-        <span data-key="0.1">0</span>
-        <button data-key="0.2">+</button>
-        <br />
+      <span data-key="0.1">0</span>
+      <button data-key="0.2">+</button>
+      <br />
 
-        <button data-key="0.0">
-          toggle
-        </button>
-      </div>
-    </section>
+      <button data-key="0.0">
+        toggle
+      </button>
+    </div>
   </main>
 
   <footer>

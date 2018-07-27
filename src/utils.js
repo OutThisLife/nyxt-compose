@@ -57,3 +57,5 @@ export const raf = (cb = () => {}, throttle = true) => {
     window.requestAnimationFrame(cb)
   }
 }
+
+export * from './bithax'
