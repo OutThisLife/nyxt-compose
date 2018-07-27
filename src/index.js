@@ -1,6 +1,6 @@
 import { shallowEqual, frag, iter, raf, snakeCase } from './utils'
 
-const attachComponent = (el, ...args) => {
+const attachComponent = el => {
   const IMPL = Object.create({
     didMount: function() {
       iter([this._events, this._vars, this._attrs], fn => fn.apply(this, arguments))
@@ -202,76 +202,102 @@ const attachComponent = (el, ...args) => {
     ]
   })
 
-  raf(() => IMPL.didMount.call(IMPL, Object.assign({}, IMPL.props)))
+  raf(() => IMPL.didMount.call(IMPL, Object.assign({}, IMPL.props)), false)
 }
 
-window.onload = () => {
-  const $app = document.getElementById('app')
-  const $nodes = document.getElementsByTagName('div')
-  const $tmp = $nodes[0].cloneNode(true)
+const attachNodes = nodes =>
+  iter(nodes, node => {
+    switch (node.nodeType) {
+      case 1:
+        let children = []
 
-  iter($nodes, el => attachComponent(el))
+        if (node.classList.contains('gc')) {
+          attachComponent(node)
+        } else if ((children = node.getElementsByClassName('gc'))) {
+          attachNodes([].slice.call(children))
+        }
 
-  let btm
-  document.body.children[0].addEventListener('click', ({ currentTarget: { dataset: { num } } }) => {
-    const $frag = document.createDocumentFragment()
-    const $div = $tmp.cloneNode(true)
-    $div.classList.add('cloned')
-
-    iter([...Array(parseInt(num))], () => $frag.appendChild($div.cloneNode(true)))
-    raf(() => $app.children[0].appendChild($frag.cloneNode(true)))
-  })
-
-  document.body.children[1].addEventListener('click', ({ currentTarget: { dataset: { num } } }) => {
-    const $frag = document.createDocumentFragment()
-    $frag.appendChild($app.children[0].cloneNode(true))
-    const $container = $frag.children[0]
-
-    let n = Math.min(parseInt(num), $container.children.length - 1)
-
-    while (n--) {
-      $container.removeChild($container.children[n])
+        break
     }
-
-    $app.replaceChild($frag.cloneNode(true), $app.children[0])
   })
 
-  // --
+// ----------------------------------------------
 
-  // [].slice
-  //   .call(document.querySelectorAll('*'))
-  //   .map(el => {
-  //     const evts = getEventListeners(el)
-  //     const listeners = Object.keys(evts).map(k => ({ event: k, listeners: evts[k] }))
+new MutationObserver(mutations => {
+  iter(mutations, mut => {
+    if (mut.type === 'childList') {
+      const nodes = [].slice.call(mut.addedNodes).filter(n => n.nodeType === 1)
 
-  //     return { el, listeners }
-  //   })
-  //   .filter(item => item.listeners.length)
-
-  new MutationObserver(mutations => {
-    iter(mutations, mut => {
-      if (mut.type === 'childList') {
-        iter(mut.addedNodes, node => {
-          if (node.tagName === 'DIV') {
-            attachComponent(node)
-          }
-        })
+      if (nodes.length) {
+        attachNodes(nodes)
       }
-    })
-  }).observe(document.body, { childList: true, subtree: true })
-
-  let stm, tick
-  window.addEventListener('scroll', () => {
-    if (!tick) {
-      raf(() => {
-        clearTimeout(stm)
-        tick = false
-
-        document.body.style.pointerEvents = 'none'
-        stm = setTimeout(() => (document.body.style.pointerEvents = ''), 350)
-      })
-
-      tick = true
     }
   })
-}
+}).observe(document.body, { childList: true, subtree: true })
+
+// ----------------------------------------------
+
+let stm
+window.addEventListener('scroll', () =>
+  raf(() => {
+    document.body.style.pointerEvents = 'none'
+
+    clearTimeout(stm)
+    stm = setTimeout(() => (document.body.style.pointerEvents = ''), 350)
+  })
+)
+
+// ----------------------------------------------
+
+const $app = document.getElementById('app')
+const $nodes = document.getElementsByClassName('gc')
+const $tmp = $nodes[0].cloneNode(true)
+
+const $add = document.body.children[0]
+const $remove = $add.nextElementSibling
+
+document.body.addEventListener('click', ({ target }) => {
+  if (target === $add || target === $remove) {
+    const $frag = document.createDocumentFragment()
+    const { num } = target.dataset
+
+    if (target === $add) {
+      const $div = $tmp.cloneNode(true)
+      $div.classList.add('cloned')
+
+      iter([...Array(parseInt(num))], () => $frag.appendChild($div.cloneNode(true)))
+      raf(() => $app.children[0].appendChild($frag.cloneNode(true)))
+    } else {
+      const $frag = document.createDocumentFragment()
+      $frag.appendChild($app.children[0].cloneNode(true))
+
+      const $container = $frag.children[0]
+      let n = Math.min(parseInt(num), $container.children.length - 1)
+
+      while (n--) {
+        $container.removeChild($container.children[n])
+      }
+
+      $app.replaceChild($frag.cloneNode(true), $app.children[0])
+    }
+  }
+})
+
+attachNodes([].slice.call($nodes))
+
+// --
+
+// let tick
+// new MutationObserver(muts => {
+//   const valid = muts.filter(({ type }) => type === 'childList')
+
+//   if (valid.length && !tick) {
+//     window.requestAnimationFrame(() => {
+//       const list = getAll()
+//       console.log('There are %d listeners', list.length, list)
+//       window.requestAnimationFrame(() => (tick = false))
+//     })
+
+//     tick = true
+//   }
+// }).observe(document.documentElement, { childList: true, subtree: true })

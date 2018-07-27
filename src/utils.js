@@ -45,4 +45,15 @@ export const iter = (set, cb) => {
 
 export const snakeCase = str => str.replace(/([a-zA-Z])(?=[A-Z])/g, '$1-').toLowerCase()
 
-export const raf = cb => window.requestAnimationFrame(cb)
+export const raf = (cb = () => {}, throttle = true) => {
+  if (throttle && !window.tick) {
+    window.requestAnimationFrame(() => {
+      delete window.tick
+      cb()
+    })
+
+    window.tick = true
+  } else if (!throttle) {
+    window.requestAnimationFrame(cb)
+  }
+}
