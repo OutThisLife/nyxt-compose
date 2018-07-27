@@ -206,22 +206,47 @@ const attachComponent = (el, ...args) => {
 }
 
 window.onload = () => {
+  const $app = document.getElementById('app')
   const $nodes = document.getElementsByTagName('div')
   const $tmp = $nodes[0].cloneNode(true)
 
   iter($nodes, el => attachComponent(el))
 
   let btm
-  document.body.children[0].addEventListener('click', () => {
+  document.body.children[0].addEventListener('click', ({ currentTarget: { dataset: { num } } }) => {
     const $frag = document.createDocumentFragment()
     const $div = $tmp.cloneNode(true)
     $div.classList.add('cloned')
 
-    iter([...Array(100)], () => $frag.appendChild($div.cloneNode(true)))
-    raf(() => document.body.appendChild($frag.cloneNode(true)))
+    iter([...Array(parseInt(num))], () => $frag.appendChild($div.cloneNode(true)))
+    raf(() => $app.children[0].appendChild($frag.cloneNode(true)))
+  })
+
+  document.body.children[1].addEventListener('click', ({ currentTarget: { dataset: { num } } }) => {
+    const $frag = document.createDocumentFragment()
+    $frag.appendChild($app.children[0].cloneNode(true))
+    const $container = $frag.children[0]
+
+    let n = Math.min(parseInt(num), $container.children.length - 1)
+
+    while (n--) {
+      $container.removeChild($container.children[n])
+    }
+
+    $app.replaceChild($frag.cloneNode(true), $app.children[0])
   })
 
   // --
+
+  // [].slice
+  //   .call(document.querySelectorAll('*'))
+  //   .map(el => {
+  //     const evts = getEventListeners(el)
+  //     const listeners = Object.keys(evts).map(k => ({ event: k, listeners: evts[k] }))
+
+  //     return { el, listeners }
+  //   })
+  //   .filter(item => item.listeners.length)
 
   new MutationObserver(mutations => {
     iter(mutations, mut => {
@@ -233,7 +258,7 @@ window.onload = () => {
         })
       }
     })
-  }).observe(document.body, { childList: true })
+  }).observe(document.body, { childList: true, subtree: true })
 
   let stm, tick
   window.addEventListener('scroll', () => {

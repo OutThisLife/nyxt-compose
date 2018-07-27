@@ -7,12 +7,14 @@
   <title>Document</title>
 
   <style>
-  body > button:after{content: 'append ' attr(data-num)}
   body > button {
     z-index: 100;
     position: fixed;
     top: 2vw;
     right: 2vw;
+  }
+  body > button + button {
+    top: 5vw;
   }
 
   .gc:nth-of-type(even) {
@@ -26,28 +28,33 @@
 </head>
 <body>
 
-  <button data-num="100"></button>
+  <button data-num="124">add 124</button>
+  <button data-num="62">remove 62</button>
 
-  <!--
-    <>
-      <button onClick={() => setToggle()}>Toggle {count}</button>
-      {toggled && <div>toggled</div>}
-    </>
-  -->
-  <div class="gc">
-    <h2>kk well lets do one more <a href='javascript:;' data-key="0.3">Remove me</a></h2>
+  <main id='app'>
+    <section>
+      <!--
+        <>
+          <button onClick={() => setToggle()}>Toggle {count}</button>
+          {toggled && <div>toggled</div>}
+        </>
+      -->
+      <div class="gc">
+        <h2>kk well lets do one more <a href='javascript:;' data-key="0.3">Remove me</a></h2>
 
-    <h3 data-key="0.4" contenteditable>hello</h3>
-    <p data-key="0.4">hello</p>
+        <h3 data-key="0.4" contenteditable>hello</h3>
+        <p data-key="0.4">hello</p>
 
-    <span data-key="0.1">0</span>
-    <button data-key="0.2">+</button>
-    <br />
+        <span data-key="0.1">0</span>
+        <button data-key="0.2">+</button>
+        <br />
 
-    <button data-key="0.0">
-      toggle
-    </button>
-  </div>
+        <button data-key="0.0">
+          toggle
+        </button>
+      </div>
+    </section>
+  </main>
 
   <script src="./index.js"></script>
 </body>
