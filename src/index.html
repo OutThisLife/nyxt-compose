@@ -5,12 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>Document</title>
+
+  <style>
+  body > button:after{content: 'append ' attr(data-num)}
+  body > button {
+    z-index: 100;
+    position: fixed;
+    top: 2vw;
+    right: 2vw;
+  }
+
+  .gc:nth-of-type(even) {
+    filter: invert(1) blur(5px);
+  }
+
+  .gc {
+    padding: 5vw;
+  }
+  </style>
 </head>
 <body>
 
-  <button>
-    append
-  </button>
+  <button data-num="100"></button>
 
   <!--
     <>

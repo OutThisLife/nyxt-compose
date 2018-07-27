@@ -71,9 +71,7 @@ const attachComponent = (el, ...args) => {
             delete $var.dataset.key
           }
 
-          raf(() => {
-            $var.replaceChild($frag.cloneNode(true), $var.childNodes[0])
-          })
+          raf(() => $var.replaceChild($frag.cloneNode(true), $var.childNodes[0]))
         })
       })
     },
@@ -207,30 +205,48 @@ const attachComponent = (el, ...args) => {
   raf(() => IMPL.didMount.call(IMPL, Object.assign({}, IMPL.props)))
 }
 
-const $nodes = document.getElementsByTagName('div')
-iter($nodes, el => attachComponent(el))
+window.onload = () => {
+  const $nodes = document.getElementsByTagName('div')
+  const $tmp = $nodes[0].cloneNode(true)
 
-new MutationObserver(mutations => {
-  iter(mutations, mut => {
-    if (mut.type === 'childList') {
-      iter(mut.addedNodes, node => {
-        if (node.tagName === 'DIV') {
-          attachComponent(node)
-        }
+  iter($nodes, el => attachComponent(el))
+
+  let btm
+  document.body.children[0].addEventListener('click', () => {
+    const $frag = document.createDocumentFragment()
+    const $div = $tmp.cloneNode(true)
+    $div.classList.add('cloned')
+
+    iter([...Array(100)], () => $frag.appendChild($div.cloneNode(true)))
+    raf(() => document.body.appendChild($frag.cloneNode(true)))
+  })
+
+  // --
+
+  new MutationObserver(mutations => {
+    iter(mutations, mut => {
+      if (mut.type === 'childList') {
+        iter(mut.addedNodes, node => {
+          if (node.tagName === 'DIV') {
+            attachComponent(node)
+          }
+        })
+      }
+    })
+  }).observe(document.body, { childList: true })
+
+  let stm, tick
+  window.addEventListener('scroll', () => {
+    if (!tick) {
+      raf(() => {
+        clearTimeout(stm)
+        tick = false
+
+        document.body.style.pointerEvents = 'none'
+        stm = setTimeout(() => (document.body.style.pointerEvents = ''), 350)
       })
+
+      tick = true
     }
   })
-}).observe(document.body, { childList: true })
-
-// --
-
-const $tmp = $nodes[0].cloneNode(true)
-
-document.body.children[0].addEventListener('click', () => {
-  const $frag = document.createDocumentFragment()
-  const $div = $tmp.cloneNode(true)
-  $div.classList.add('cloned')
-  $frag.appendChild($div)
-
-  document.body.appendChild($frag)
-})
+}
