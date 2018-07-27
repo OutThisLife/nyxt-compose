@@ -207,4 +207,30 @@ const attachComponent = (el, ...args) => {
   raf(() => IMPL.didMount.call(IMPL, Object.assign({}, IMPL.props)))
 }
 
-iter(document.getElementsByTagName('div'), el => attachComponent(el))
+const $nodes = document.getElementsByTagName('div')
+iter($nodes, el => attachComponent(el))
+
+new MutationObserver(mutations => {
+  iter(mutations, mut => {
+    if (mut.type === 'childList') {
+      iter(mut.addedNodes, node => {
+        if (node.tagName === 'DIV') {
+          attachComponent(node)
+        }
+      })
+    }
+  })
+}).observe(document.body, { childList: true })
+
+// --
+
+const $tmp = $nodes[0].cloneNode(true)
+
+document.body.children[0].addEventListener('click', () => {
+  const $frag = document.createDocumentFragment()
+  const $div = $tmp.cloneNode(true)
+  $div.classList.add('cloned')
+  $frag.appendChild($div)
+
+  document.body.appendChild($frag)
+})
