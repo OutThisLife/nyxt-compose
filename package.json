@@ -5,12 +5,14 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "parcel ./src/index.html --open"
+    "dev": "parcel ./src/index.html --open",
+    "build": "parcel build ./src/index.html",
+    "start": "parcel ./src/index.html"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "devDependencies": {
+  "dependencies": {
     "parcel-bundler": "^1.9.7"
   }
 }
