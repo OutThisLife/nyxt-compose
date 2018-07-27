@@ -285,12 +285,11 @@ document.body.addEventListener('click', ({ target }) => {
 
 // ----------------------------------------------
 
-const $textarea = document.querySelector('textarea')
-const $note = $textarea.nextElementSibling
+document.querySelector('textarea').addEventListener('focus', ({ currentTarget }) => {
+  const $note = currentTarget.nextElementSibling
 
-$textarea.addEventListener('focus', () => {
-  $textarea.select()
+  currentTarget.select()
   new Promise(resolve => resolve(document.execCommand.call(document, 'Copy'))).then(() => ($note.innerHTML = 'Copied!'))
-})
 
-$textarea.addEventListener('blur', () => ($note.innerHTML = '&nbsp;'))
+  currentTarget.addEventListener('blur', () => ($note.innerHTML = '&nbsp;'), { once: true })
+})
