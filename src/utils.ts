@@ -44,7 +44,7 @@ export const frag = (str: string): DocumentFragment =>
       .trim()
   )
 
-export const iter = (set: any[] | number, cb: Function = () => {}): void => {
+export const iter = (set: any[] | number, cb: (a: any) => any): void => {
   let l: number
 
   if (typeof set === 'object') {
@@ -62,14 +62,15 @@ export const iter = (set: any[] | number, cb: Function = () => {}): void => {
 
 export const snakeCase = (str: string): string => str.replace(/([a-zA-Z])(?=[A-Z])/g, '$1-').toLowerCase()
 
-export const raf = (cb = () => {}, throttle = true) => {
-  if (throttle && !global.tick) {
+export const raf = (cb: () => any, throttle: boolean = true) => {
+  let tick
+  if (throttle && !tick) {
     window.requestAnimationFrame(() => {
-      delete global.tick
+      tick = false
       cb()
     })
 
-    global.tick = true
+    tick = true
   } else if (!throttle) {
     window.requestAnimationFrame(cb)
   }
