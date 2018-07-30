@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "parcel ./src/index.html -p $PORT",
-    "dev": "parcel ./src/index.html --open",
-    "build": "parcel build ./src/index.html",
-    "postinstall": "npm run build",
+    "start": "parcel src/index.html -p $PORT",
+    "dev": "parcel src/index.html --open",
+    "build": "parcel build src/index.html",
+    "postinstall": "parcel build src/index.html",
     "tslint-check": "tslint-config-prettier-check ./tslint.json"
   },
   "keywords": [],
