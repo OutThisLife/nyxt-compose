@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "parcel src/index.html -p $PORT",
+    "start": "serve dist -l $PORT",
     "dev": "parcel src/index.html --open",
     "build": "parcel build src/index.html",
-    "postinstall": "parcel build src/index.html",
+    "postinstall": "npm run build",
     "tslint-check": "tslint-config-prettier-check ./tslint.json"
   },
   "keywords": [],
@@ -15,16 +15,17 @@
   "license": "ISC",
   "dependencies": {
     "babel-core": "^6.26.3",
+    "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "babel-plugin-transform-runtime": "^6.23.0",
     "babel-preset-env": "^1.7.0",
-    "parcel-bundler": "^1.9.7"
+    "parcel-bundler": "^1.9.7",
+    "serve": "^9.4.0",
+    "typescript": "^2.9.2"
   },
   "devDependencies": {
-    "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "prettier": "^1.13.7",
     "tslint": "^5.11.0",
     "tslint-config-prettier": "^1.14.0",
-    "typescript": "^2.9.2",
     "typescript-eslint-parser": "^17.0.1"
   }
 }
