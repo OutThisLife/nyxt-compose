@@ -7,7 +7,7 @@
     "start": "parcel ./src/index.html -p $PORT",
     "dev": "parcel ./src/index.html --open",
     "build": "parcel build ./src/index.html",
-    "postinstall": "yarn build",
+    "postinstall": "npm run build",
     "tslint-check": "tslint-config-prettier-check ./tslint.json"
   },
   "keywords": [],
