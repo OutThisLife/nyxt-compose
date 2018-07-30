@@ -33,6 +33,27 @@ if (!$app) {
 
   attachNodes([].slice.call($nodes))
 
+  new MutationObserver(mutations => {
+    iter(mutations, (mut: MutationRecord) => {
+      if (mut.type === 'childList') {
+        const nodes = [].slice.call(mut.addedNodes).filter((n: HTMLElement) => n.nodeType === 1)
+
+        if (nodes.length) {
+          attachNodes(nodes)
+        }
+
+        raf(() => {
+          const $frag = document.createDocumentFragment()
+          $frag.appendChild(document.createTextNode($app.children.length.toString()))
+
+          if ($count) {
+            $count.children[0].replaceChild($frag, $count.children[0].childNodes[0])
+          }
+        })
+      }
+    })
+  }).observe($app, { childList: true, subtree: true })
+
   // ----------------------------------------------
 
   let stm: number
@@ -63,7 +84,7 @@ if (!$app) {
           raf(() => $app.appendChild($frag.cloneNode(true)))
         } else {
           iter(MIN_INT(num | 0, $app.children.length), () =>
-            raf(() => $app.lastChild && $app.removeChild($app.lastChild), false)
+            raf(() => $app.lastElementChild && $app.removeChild($app.lastElementChild), false)
           )
         }
       }
@@ -84,25 +105,4 @@ if (!$app) {
       $textarea.addEventListener('blur', () => $note && ($note.innerHTML = '&nbsp;'), { once: true })
     })
   }
-
-  new MutationObserver(mutations => {
-    iter(mutations, (mut: MutationRecord) => {
-      if (mut.type === 'childList') {
-        const nodes = [].slice.call(mut.addedNodes).filter((n: HTMLElement) => n.nodeType === 1)
-
-        if (nodes.length) {
-          attachNodes(nodes)
-        }
-
-        raf(() => {
-          const $frag = document.createDocumentFragment()
-          $frag.appendChild(document.createTextNode($app.children.length.toString()))
-
-          if ($count) {
-            $count.children[0].replaceChild($frag, $count.children[0].childNodes[0])
-          }
-        })
-      }
-    })
-  }).observe($app, { childList: true, subtree: true })
 })()

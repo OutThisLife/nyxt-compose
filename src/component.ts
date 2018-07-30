@@ -1,7 +1,11 @@
 import { frag, iter, raf, shallowEqual } from './utils'
 
-interface IObj extends Object {
+export interface IObj extends Object {
   [key: string]: any
+}
+
+export interface INYXT extends HTMLElement {
+  __nyxt__: Impl
 }
 
 interface IEventGroup {
@@ -11,13 +15,13 @@ interface IEventGroup {
 
 interface IEvent {
   selector: string
-  handle: (this: any, a: IObj) => () => any
+  handle: (this: any) => (a?: IProps) => any
 }
 
 interface IFrag {
   $frag: DocumentFragment
   adjSelector: string
-  assert: (a: IObj, b: IObj) => Promise<{}>
+  assert: (a: IObj, b?: IObj) => Promise<{}>
 }
 
 interface IPropVar {
@@ -25,75 +29,83 @@ interface IPropVar {
   selector: string
 }
 
-interface INYXT extends HTMLElement {
-  __nyxt__: Impl
+interface IProps {
+  [index: string]: IObj
+  current: IObj
+  next: IObj
+  previous: IObj
 }
 
 interface Impl {
-  el: INYXT
-  mounted: boolean
+  isMounted: number
+  props?: IProps
 
-  didMount: (...a: IObj[]) => Impl
-  setProps: (a: IObj) => IObj
-  didUpdate: (...a: IObj[]) => Impl
-  willUnmount: () => Impl
+  didMount: (...a: IObj[]) => void
 
-  _addEvents: () => Impl
-  _parseCondElements: () => Impl
-  _parseVariables: (a: IObj) => Impl
+  shouldUpdate: () => Promise<{}>
+  interceptors: Array<(a?: IObj, b?: IObj) => boolean | void>
+  didUpdate: () => void
 
-  props?: IObj
-  $vars: IPropVar[]
+  destroyers: Array<(a?: IObj, b?: IObj) => boolean | void>
+  unmount: () => void
+  willUnmount: () => Promise<{}>
+
   $events: IEventGroup[]
+  _addEvents: () => void
+
   $frags: IFrag[]
+  _parseFrags: () => void
+
+  $vars: IPropVar[]
+  _parseVariables: () => void
 }
 
 // ------------------------------------------------------
 
-const component: Impl = {
-  el: document.body,
-  mounted: false,
+const component = (el: HTMLElement): Impl => ({
+  isMounted: 0,
 
-  didMount(...args) {
-    this.mounted = true
-    iter([this._addEvents, this._parseVariables], (fn: () => void) => fn.apply(this, ...args))
-    return this
+  didMount() {
+    this.isMounted = 1
+    iter([this._addEvents, this._parseVariables], (fn: () => void) => fn.call(this))
   },
 
-  didUpdate(...args) {
-    if (this.mounted) {
-      iter([this._parseCondElements, this._parseVariables], (fn: () => void) => fn.apply(this, ...args))
+  interceptors: [(a, b) => !shallowEqual(a, b)],
+  shouldUpdate() {
+    const { current = {}, next = {} } = this.props || {}
+    return Promise.all(this.interceptors.map(fn => new Promise((y, n) => (fn(current, next) ? y() : n()))))
+      .then(() => new Promise(y => y()))
+      .catch(e => new Promise((_, n) => n('intercepted')))
+  },
+
+  didUpdate() {
+    if (this.isMounted) {
+      iter([this._parseFrags, this._parseVariables], (fn: () => void) => fn.call(this))
+
+      if (this.props) {
+        el.style.backgroundColor = this.props.toggled ? '#f36' : '#FFF'
+      }
     }
-
-    return this
   },
 
-  async setProps(newProps) {
-    if (this.props instanceof Object) {
-      const keys = Object.keys(newProps)
-
-      await iter(keys, (prop: string) =>
-        Object.defineProperty(this.props, prop, {
-          value: newProps[prop]
-        })
-      )
-    }
-
-    return this
-  },
-
+  destroyers: [],
   willUnmount() {
-    // noop
-    if (this.el.parentElement) {
-      this.el.parentElement.removeChild(this.el)
-    }
-
-    return this
+    const { current = {} } = this.props || {}
+    return Promise.all(this.destroyers.map(fn => new Promise(y => fn(current) && y())))
   },
 
+  async unmount() {
+    await this.willUnmount()
+
+    if (el.parentElement) {
+      el.parentElement.removeChild(el)
+    }
+  },
+
+  $events: [],
   _addEvents() {
     iter(this.$events, ({ type, events }: IEventGroup) => {
-      this.el.addEventListener(type, e =>
+      el.addEventListener(type, e =>
         iter(
           events,
           ({ selector, handle }: IEvent): -1 | void => {
@@ -109,7 +121,7 @@ const component: Impl = {
 
             if (target.matches(selector)) {
               try {
-                raf(() => handle(this.props || {})())
+                raf(() => handle.call(this)(this.props))
               } catch (e) {
                 console.trace(e)
               }
@@ -119,17 +131,20 @@ const component: Impl = {
           }
         )
       )
-    })
 
-    return this
+      this.$events.pop()
+    })
   },
 
-  _parseCondElements() {
+  $frags: [],
+  _parseFrags() {
+    const { current = {}, previous = {} } = this.props || {}
+
     iter(
       this.$frags,
       (obj: IFrag): -1 | void => {
         const { adjSelector, $frag, assert } = obj
-        const $sibling = this.el.querySelector(adjSelector)
+        const $sibling = el.querySelector(adjSelector)
         const $parent = $sibling && $sibling.parentNode
         const $next = $sibling && $sibling.nextSibling
 
@@ -138,86 +153,48 @@ const component: Impl = {
         }
 
         assert
-          .apply(this, arguments)
+          .call(this, current, previous)
           .then(() => raf(() => $parent.insertBefore($frag.cloneNode(true), $next)))
           .catch((rm: boolean) => rm && raf(() => $parent.removeChild($next)))
       }
     )
-
-    return this
   },
 
-  _parseVariables(props) {
+  $vars: [],
+  _parseVariables() {
+    const { current = {} } = this.props || {}
+
     iter(
       this.$vars,
       (obj: IPropVar): -1 | void => {
         const { prop, selector } = obj
-        const $foundVars = this.el.querySelectorAll(selector)
+        const $foundVars = el.querySelectorAll(selector)
 
-        if (!($foundVars && prop in props)) {
+        if (!($foundVars && prop in current)) {
           return -1
         }
 
         const $frag = document.createDocumentFragment()
-        $frag.appendChild(document.createTextNode(props[prop]))
+        $frag.appendChild(document.createTextNode(current[prop]))
 
         iter([].slice.call($foundVars), ($var: HTMLElement) => {
           raf(() => $var.replaceChild($frag.cloneNode(true), $var.childNodes[0]))
         })
       }
     )
-
-    return this
-  },
-
-  $events: [],
-  $frags: [],
-  $vars: []
-}
+  }
+})
 
 // ------------------------------------------------------
 
 export const attachComponent = async (el: HTMLElement, initialProps: IObj = {}): Promise<Impl> => {
-  const c: Impl = Object.create(component)
-
   if (el.hasOwnProperty('__nyxt__')) {
     return (el as INYXT).__nyxt__
   }
 
-  Object.defineProperty(el, '__nyxt__', { value: c })
-  Object.defineProperty(c, 'el', { value: el })
-  Object.defineProperty(c, 'props', {
-    value: new Proxy(
-      {},
-      {
-        set: (props: IObj, prop: string, nv: any): boolean => {
-          const oldProps = Object.assign({}, props)
-          const ov = oldProps[prop]
+  const c: Impl = component(el)
 
-          if (!shallowEqual(ov, nv)) {
-            props[prop] = nv
-            c.didUpdate.call(c, props, oldProps)
-
-            return true
-          }
-
-          return false
-        },
-
-        get: (props: IObj, prop: string): any => {
-          if (prop in props) {
-            return props[prop]
-          }
-
-          return undefined
-        }
-      }
-    )
-  })
-
-  await c.setProps(initialProps)
-
-  c.$vars.concat([
+  c.$vars.push(
     {
       prop: 'count',
       selector: '[data-key="0.1"]'
@@ -226,36 +203,38 @@ export const attachComponent = async (el: HTMLElement, initialProps: IObj = {}):
       prop: 'title',
       selector: '[data-key="0.4"]'
     }
-  ])
+  )
 
-  c.$frags.concat([
-    {
-      $frag: frag('<div>toggled</div>'),
-      adjSelector: '[data-key="0.0"]',
-      assert: ({ toggled }, oldProps): Promise<{}> => {
-        const diff = !shallowEqual(toggled, oldProps.toggled)
-        return new Promise((y, n) => (toggled && diff ? y() : n(diff)))
-      }
+  c.$frags.push({
+    $frag: frag('<div>toggled</div>'),
+    adjSelector: '[data-key="0.0"]',
+    assert({ toggled = false }, previous = {}) {
+      const diff = toggled ^ previous.toggled
+      return new Promise((y, n) => (toggled && diff ? y() : n(diff)))
     }
-  ])
+  })
 
   c.$events.push({
     events: [
       {
         handle() {
-          return (): number => (c.props ? ((c.props.toggled as number) ^= 1) : 0)
+          return () => {
+            this.props.toggled ^= 1
+          }
         },
         selector: '[data-key="0.0"]'
       },
       {
         handle() {
-          return (): number => (c.props ? (c.props.count += 1) : 0)
+          return () => {
+            this.props.count += 1
+          }
         },
         selector: '[data-key="0.2"]'
       },
       {
         handle() {
-          return () => raf(() => c.el.parentNode && c.el.parentNode.removeChild(c.el))
+          return () => this.unmount()
         },
         selector: '[data-key="0.3"]'
       }
@@ -263,20 +242,45 @@ export const attachComponent = async (el: HTMLElement, initialProps: IObj = {}):
     type: 'mousedown'
   })
 
+  Object.defineProperty(c, 'props', {
+    value: new Proxy(
+      {
+        current: initialProps,
+        next: {},
+        previous: {}
+      },
+      {
+        set: (props: IProps, prop: string, newValue: any): boolean => {
+          props.next = {
+            ...props.current,
+            [prop]: newValue
+          }
+
+          c.shouldUpdate()
+            .then(() => c.didUpdate())
+            .catch(e => console.trace(e))
+
+          props.previous = props.current
+          props.current = props.next
+          props.next = {}
+
+          return true
+        },
+
+        get: (props: IProps, prop: string): IObj => {
+          if (prop in props) {
+            return props[prop]
+          }
+
+          return props.current[prop]
+        }
+      }
+    )
+  })
+
+  Object.defineProperty(el, '__nyxt__', {
+    value: c
+  })
+
   return raf(() => c.didMount()), c
 }
-
-/*
-
-  get attrs() {
-    const { toggled } = this.props
-
-    return {
-      style: {
-        background: toggled ? '#f36' : '#fafafa',
-        transition: '.3s ease-in-out'
-      }
-    }
-  },
-
-*/
